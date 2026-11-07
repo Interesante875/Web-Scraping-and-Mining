@@ -1,6 +1,6 @@
 """Smart Device Telemetry Dashboard - Flask backend.
 
-Run:  python app.py   then open http://localhost:5000
+Run:  python3 app.py   then open http://localhost:5001
 """
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -124,4 +124,4 @@ def post_diagnostics(device_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001)
