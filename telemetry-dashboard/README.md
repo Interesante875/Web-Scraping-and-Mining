@@ -24,7 +24,7 @@ All bodies are JSON. Errors return `{"error": "<message>"}` with 400 (bad input)
 | POST | `/api/devices` | `{"id":"ssd-001","model":"Samsung 980","location":"Rack A"}` | 201, device |
 | GET | `/api/devices` | none | 200, list of devices with `latest` reading + `status` |
 | GET | `/api/devices/<id>` | none | 200, device + last 10 `telemetry`, `selftests`, `diagnostics` |
-| POST | `/api/devices/<id>/telemetry` | `{"temperature":45,"power_cycles":120,"bytes_written":50010}` | 201, reading + timestamp |
+| POST | `/api/devices/<id>/telemetry` | `{"temperature":45,"power_cycles":120,"bytes_written":50000}` | 201, reading + timestamp |
 | POST | `/api/devices/<id>/selftest` | none | 201, `{"id":1,"status":"triggered","triggered_at":"..."}` |
 | POST | `/api/devices/<id>/diagnostics` | `{"result":"pass","errors":0,"log":"SMART OK"}` | 201, result + timestamp |
 
