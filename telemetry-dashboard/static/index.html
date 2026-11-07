@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Device Telemetry Dashboard</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    table { border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    tr.clickable:hover { background: #f0f0f0; cursor: pointer; }
+    .healthy { color: green; } .warning { color: orange; }
+    .error { color: red; } .unknown { color: gray; }
+    .box { border: 1px solid #ccc; padding: 10px; margin-bottom: 20px; }
+    input { margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Device Telemetry Dashboard</h1>
+
+  <div class="box">
+    <b>Register device:</b>
+    <input id="newId" placeholder="Device ID">
+    <input id="newModel" placeholder="Model">
+    <input id="newLocation" placeholder="Location">
+    <button onclick="registerDevice()">Register</button>
+    <span id="msg"></span>
+  </div>
+
+  <h2>Devices</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Model</th><th>Location</th><th>Temp (C)</th>
+      <th>Power cycles</th><th>Bytes written</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody id="deviceRows"></tbody>
+  </table>
+
+  <div id="detail"></div>
+
+<script>
+  let selectedId = null;
+
+  async function api(method, url, body) {
+    const res = await fetch(url, {
+      method, headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    return data;
+  }
+
+  async function registerDevice() {
+    const msg = document.getElementById("msg");
+    try {
+      await api("POST", "/api/devices", {
+        id: document.getElementById("newId").value.trim(),
+        model: document.getElementById("newModel").value,
+        location: document.getElementById("newLocation").value,
+      });
+      msg.textContent = "Registered!";
+      loadDevices();
+    } catch (e) { msg.textContent = "Error: " + e.message; }
+  }
+
+  async function triggerSelfTest(id, event) {
+    event.stopPropagation();  // don't also open the detail view
+    try {
+      await api("POST", `/api/devices/${id}/selftest`);
+      alert(`Self-test triggered on ${id}`);
+      selectedId = id;
+      refresh();
+    } catch (e) { alert("Error: " + e.message); }
+  }
+
+  async function loadDevices() {
+    const devices = await api("GET", "/api/devices");
+    document.getElementById("deviceRows").innerHTML = devices.map(d => `
+      <tr class="clickable" onclick="selectedId='${d.id}'; loadDetail()">
+        <td>${d.id}</td><td>${d.model}</td><td>${d.location}</td>
+        <td>${d.latest ? d.latest.temperature : "-"}</td>
+        <td>${d.latest ? d.latest.power_cycles : "-"}</td>
+        <td>${d.latest ? d.latest.bytes_written : "-"}</td>
+        <td class="${d.status}"><b>${d.status.toUpperCase()}</b></td>
+        <td><button onclick="triggerSelfTest('${d.id}', event)">Run self-test</button></td>
+      </tr>`).join("");
+  }
+
+  async function loadDetail() {
+    if (!selectedId) return;
+    const d = await api("GET", `/api/devices/${selectedId}`);
+    const time = t => new Date(t).toLocaleString();
+    document.getElementById("detail").innerHTML = `
+      <h2>Device ${d.id} - <span class="${d.status}">${d.status.toUpperCase()}</span></h2>
+      <h3>Last 10 telemetry readings</h3>
+      <table><tr><th>Time</th><th>Temp (C)</th><th>Bytes written</th><th>Power cycles</th></tr>
+        ${d.telemetry.map(r => `<tr><td>${time(r.timestamp)}</td><td>${r.temperature}</td>
+          <td>${r.bytes_written}</td><td>${r.power_cycles}</td></tr>`).join("")}
+      </table>
+      <h3>Self-tests</h3>
+      <table><tr><th>#</th><th>Triggered at</th><th>Status</th></tr>
+        ${d.selftests.map(t => `<tr><td>${t.id}</td><td>${time(t.triggered_at)}</td>
+          <td>${t.status}</td></tr>`).join("")}
+      </table>
+      <h3>Diagnostic results</h3>
+      <table><tr><th>Time</th><th>Result</th><th>Errors</th><th>Log</th></tr>
+        ${d.diagnostics.map(r => `<tr><td>${time(r.timestamp)}</td>
+          <td class="${r.result === "pass" ? "healthy" : "error"}">${r.result}</td>
+          <td>${r.errors}</td><td>${r.log}</td></tr>`).join("")}
+      </table>`;
+  }
+
+  function refresh() { loadDevices(); loadDetail(); }
+
+  refresh();
+  setInterval(refresh, 3000);  // live updates by polling every 3s
+</script>
+</body>
+</html>
